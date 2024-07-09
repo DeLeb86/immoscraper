@@ -3,22 +3,24 @@ from scrapy import Field
 import json,re
 
 
-mapping={
-    "id" : {"PropertyId": lambda x :x},
-    "type" : {"TypeOfProperty":lambda x : 1 if x=="house" else 2},
-    "zip" : { "PostalCode": lambda x : int(str(x.strip().lower())) if str(x.strip().lower()).isdigit() else None},
-    "subtype":{"SubtypeOfProperty":lambda x : x},
-    "transactionType":{"TypeOfSale": lambda x: 1 if "sale" in x.strip().lower() else 2},
-    "price":{"Price": lambda x : int(x) if str(x).isdigit() else None},
-    "kitchen" : {"Kitchen": lambda x : x["type"].strip().lower() if len(x["type"].strip())>0 else None},
-    "building" : {"StateOfBuilding": lambda x : x["condition"].strip().lower() if len(x["condition"].strip())>1 else None},
-    "energy" : {"Heating": lambda x : x["heatingType"].strip().lower() if len(x["heatingType"].strip())>0 else None},
-    "bedroom" : {"Bedrooms": lambda x : int(x["count"].strip()) if str(x["count"].strip()).isdigit() else None},
-    "land": {"SurfaceOfGood": lambda x : float(x) if  str(x).replace(".","").isdigit() else None},
-    "outdoor" : {"Terrace" : lambda x : "exists" in x["terrace"] and "true" in str(x["terrace"]["exists"].strip())},
-    "wellnessEquipment": {"SwimmingPool": lambda x : ("true" in x["hasSwimmingPool"] or "yes" in x["hasSwimmingPool"])},
-    "land" : {"SurfaceOfGood" : lambda x : float(x["surface"]) if  str(x["surface"]).replace(".","").isdigit() else None }
-}
+#mapping={
+#    "PropertyId": lambda x :x["id"],
+#    "TypeOfProperty":lambda x : 1 if x["property"]["type"].lower().strip()=="house" else 2,
+#    "SubtypeOfProperty":lambda x : x["property"]["subtype"].lower().strip(),
+#    "PostalCode": lambda x : int(str(x["property"]["location"]["postalCode"].strip().lower())) \
+#        if str(x["property"]["location"]["postalCode"].strip().lower()).isdigit() else None,
+#    "TypeOfSale": lambda x: x["price"]["type"] if "price" in x else None,
+#    "Price": lambda x : int(x["price"]["mainValue"]) if x["price"] in x else None,
+#    "MonthlyCharges":lambda x:int(x["price"]["additionalValue"]) if "price" in x and x["price"]["additionalValue"] is not None else None,
+#    "Kitchen": lambda x : x["type"].strip().lower() if len(x["type"].strip())>0 else None},
+#    "building" : {"StateOfBuilding": lambda x : x["condition"].strip().lower() if len(x["condition"].strip())>1 else None},
+#    "energy" : {"Heating": lambda x : x["heatingType"].strip().lower() if len(x["heatingType"].strip())>0 else None},
+#    "bedroom" : {"Bedrooms": lambda x : int(x["count"].strip()) if str(x["count"].strip()).isdigit() else None},
+#    "land": {"SurfaceOfGood": lambda x : float(x) if  str(x).replace(".","").isdigit() else None},
+#    "outdoor" : {"Terrace" : lambda x : "exists" in x["terrace"] and "true" in str(x["terrace"]["exists"].strip())},
+#    "wellnessEquipment": {"SwimmingPool": lambda x : ("true" in x["hasSwimmingPool"] or "yes" in x["hasSwimmingPool"])},
+#    "land" : {"SurfaceOfGood" : lambda x : float(x["surface"]) if  str(x["surface"]).replace(".","").isdigit() else None }
+#}
 
 
 class ImmoItem(Item):
@@ -30,72 +32,109 @@ class ImmoItem(Item):
         Item: Scrapy default item type
     """
     js=Field()
-    html_elems=Field()
+    #html_elems=Field()
     Url=Field()
     PostalCode=Field()
+    Country=Field()
+    Locality = Field()
+    Region=Field()
+    Province=Field()
+    District=Field()
     PropertyId  = Field()
+    Price=Field()
+    MonthlyCharges = Field()
     TypeOfProperty=Field()
     SubtypeOfProperty=Field()
     TypeOfSale=Field()
-    Bedrooms=Field()
+    BedroomCount=Field()
+    BathroomCount=Field()
+    ShowerCount=Field()
+    ToiletCount=Field()
+    RoomCount=Field()
     LivingArea=Field()
-    SurfaceOfGood=Field()
+    SurfaceOfPlot=Field()
     Terrace=Field()
     Garden=Field()
     GardenArea=Field()
-    Price=Field()
     Kitchen=Field()
-    Furnished=Field()
-    Openfire=Field()
+    Fireplace=Field()
     NumberOfFacades=Field()
-    SwimmingPool=Field()
     StateOfBuilding=Field()
-    Heating=Field()
     ConstructionYear=Field()
+    FloodingZone = Field()
+    SwimmingPool=Field()
+    Heating=Field()
+    Furnished=Field()
+    PEB = Field()
     
+    
+    
+    
+    def init_all(self,value=None):
+        for k, v in self.fields.items():
+            self[k]=value
+            
     
     def transform(self):
         """
             Update the object with the values that are in the js and html
         """
-        self["Openfire"]=False
-        self["Furnished"]=False
-        self["Terrace"]=False
-        self["Garden"]=False
-        for k,v in mapping.items():
-            if k in self["js"]:
-                key,func=list(v.items())[0] 
-                self[key]=func(self["js"][k])
-        for k,v in self["html_elems"].items():
-            v=v.strip().lower()
-            k=k.strip().lower()
-            if "bedroom" in k and ("Bedrooms" not in self.keys() or self["Bedrooms"] is None):
-                self["Bedrooms"]=int(v) if str(v).isdigit() else None
-            elif re.search("(living.*area|livable.*space)",k) is not None and ("LivingArea" not in self.keys() or self["LivingArea"] is None):
-                v=re.sub("m[²2]","",v)
-                self["LivingArea"]=float(v) if str(v.replace(".","").replace(",","")).isdigit() else None
-            elif re.search("(surface.*plot|of land)",k) is not None and ("SurfaceOfGod" not in self.keys() or self["SurfaceOfGood"] is  None):
-                v=re.sub("m[²2]","",v)
-                self["SurfaceOfGood"]=float(v) if str(v.replace(".","").replace(",","")).isdigit() else None
-            elif re.search("number.*(frontage|facade)",k) is not None and ("NumberOfFacades" not in self.keys() or self["NumberOfFacades"] is None):
-                self["NumberOfFacades"]=int(v) if str(v).isdigit() else None
-            elif re.search("kitchen.*type",k ) is not None and ("Kitchen" not in self.keys() or self["Kitchen"] is None):
-                self["Kitchen"]=v
-            elif re.match("garden",k) is not None and ("Garden" not in self.keys() or self["Garden"] is None) :
-                self["Garden"]=re.search("(true|yes)",v) is not None
-            elif re.search("garden.*(area|surface)",k) is not None and ("GardenArea" not in self.keys() or self["GardenArea"] is None):
-                v=re.sub("m[²2]","",v)
-                self["Garden"]=True
-                self["GardenArea"]=float(v) if str(v.replace(".","").replace(",","")).isdigit() else None
-            elif re.match("terrace",k) is not None and ("Terrace" not in self.keys() or (self["Terrace"] is None or self["Terrace"] is False)):
-                self["Terrace"]=re.search("(true|yes)",v) is not None
-            elif re.search("terrace",k) is not None and ("Terrace" not in self.keys() or (self["Terrace"] is None or self["Terrace"] is False)):
-                self["Terrace"]=re.search("(no|false)",v) is not None
-            elif re.search("construction.*year",k) is not None and "ConstructionYear" not in self.keys():
-                self["ConstructionYear"]=int(v) if v.isdigit() else None 
-            elif re.search("(openfire|fireplace)",k) is not None and ("Openfire" not in self.keys() or self["Openfire"] is not None):
-                self["Openfire"]=re.search("(yes|true)",v) is not None   
-            elif re.search("furnished",k) is not None and ("Furnished" not in self.keys() or (self["Furnished"] is None or self["Furnished"] is False)):
-                self["Furnished"]=re.search("(yes|true|[0-9]+)",v) is not None 
+        for field in self.fields:
+            self.setdefault(field,None)
+        data=self["js"]
+        
+        self["PropertyId"]=data["id"]
+        self["TypeOfProperty"]=1 if data["property"]["type"].lower().strip()=="house" else 2
+        self["SubtypeOfProperty"]=data["property"]["subtype"].lower().strip() \
+            if data["property"] is not None else None
+        if "price" in data :
+            self["TypeOfSale"]=data["price"]["type"]
+            self["Price"] = int(data["price"]["mainValue"]) if "mainValue" in data["price"] and data["price"]["mainValue"] is not None else None
+            self["MonthlyCharges"] = int(data["price"]["additionalValue"]) \
+                if "additionalValue" in data["price"] and data["price"]["additionalValue"] is not None else None 
+            
+        if "property" in data:
+            if "location" in data["property"]:
+                self["PostalCode"]=int(str(data["property"]["location"]["postalCode"].strip().lower())) \
+                    if str(data["property"]["location"]["postalCode"].strip().lower()).isdigit() else None
+                self["Locality"]=data["property"]["location"]["locality"]
+                self["Country"]=data["property"]["location"]["country"]
+                self["Region"]=data["property"]["location"]["region"]
+                self["Province"]=data["property"]["location"]["province"]
+                self["District"]=data["property"]["location"]["district"]
+        
+            if "energy" in data["property"]:
+                if "heatingType" in data["property"]["energy"]: self["Heating"]=data["property"]["energy"]["heatingType"]
+                if "hasHeatingPump" in data["property"]["energy"] and data["property"]["energy"]["hasHeatingPump"] == True : self["Heating"]="HeatingPump"
+            if "kitchen" in data["property"].keys() and data["property"]["kitchen"] is not None:
+                self["Kitchen"] = data["property"]["kitchen"]["type"]
+            
+            if "netHabitableSurface" in data["property"] : 
+                self["LivingArea"]=data["property"]["netHabitableSurface"]
+            if "hasTerrace" in data["property"]: self["Terrace"]=data["property"]["hasTerrace"]
+            if "hasGarden" in data["property"] : self["Garden"]=data["property"]["hasGarden"]
+            if "gardenSurface" in data["property"] : self["GardenArea"]=data["property"]["gardenSurface"]
+            if "bedroomCount" in data["property"] : self["BedroomCount"]=data["property"]["bedroomCount"]
+            if "roomCount" in data["property"] : self["RoomCount"]=data["property"]["roomCount"]
+            if "bathroomCount" in data["property"] : self["BathroomCount"]=data["property"]["bathroomCount"]   
+            if "showerRoomCount" in data["property"] : self["ShowerCount"]=data["property"]["showerRoomCount"]   
+            if "toiletCount" in data["property"] : self["ToiletCount"]=data["property"]["toiletCount"]   
+            if "fireplaceCount" in data["property"] : self["Fireplace"]=True if data["property"]["fireplaceCount"] is not None and  data["property"]["fireplaceCount"]>0 else None
+            if "constructionPermit" in data["property"] : self["FloodingZone"]=data["property"]["constructionPermit"]["floodZoneType"]
+            if "building" in data["property"] and data["property"]["building"]: 
+                self["NumberOfFacades"] = data["property"]["building"]["facadeCount"] 
+                self["StateOfBuilding"] = data["property"]["building"]["condition"]
+                self["ConstructionYear"] = data["property"]["building"]["constructionYear"]
+        
+            if "land" in data["property"] and data["property"]["land"] is not None : self["SurfaceOfPlot"]=data["property"]["land"]["surface"] if data["property"]["land"]["surface"] is not None else None
+            if "hasSwimmingPool" in data["property"] : self["SwimmingPool"]=data["property"]["hasSwimmingPool"]
+        if "transaction" in data:
+            if "certificates" in data["transaction"] and data["transaction"]["certificates"] is not None:
+                self["PEB"]=data["transaction"]["certificates"]["epcScore"] if "epcScore" in data["transaction"]["certificates"] else None
+            if "sale" in data["transaction"] and data["transaction"]["sale"] is not None :
+                self["Furnished"]=data["transaction"]["sale"]["isFurnished"]
                 
+        
+        
+        
                     

@@ -51,16 +51,20 @@ class ImmowebscraperSpider(SitemapSpider):
         self.logger.info("parsing properties for  : {}".format(response.url))
         
         for url in self._filter(soup.find_all("loc")):
-            
             yield Request(url,callback=self.parse_property)
                 
-
+    def get_json_from_js(self,s):
+        s==re.sub("window.classified ?= ?","",s.strip())
+        s=re.sub("<[^>]+>","",s.replace("\n","  "))
+        if s.endswith(";"):s=s[:-1]
+        return json.loads(s)
     def parse_property(self,response):
-        jscript=response.xpath("//script[contains(.,'window.dataLayer')]/text()")[0].get()
+        jscript=response.xpath("//script[contains(.,'window.classified')]/text()")[0].get()
+        
         it=ImmoItem()
-        jscript=re.search("window.dataLayer.push\((.+?)\);",jscript,flags=re.DOTALL).group(1)
-        it["js"]=json.loads(jscript)["classified"]
-        it["html_elems"]=self.get_html_elem(response)
+        jscript=re.search("window.classified =(.+?});",jscript,flags=re.DOTALL).group(1)
+        it["js"]=self.get_json_from_js(jscript)
+        #it["html_elems"]=self.get_html_elem(response)
         it["Url"]=response.url
         yield it
         

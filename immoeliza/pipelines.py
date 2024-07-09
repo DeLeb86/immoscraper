@@ -7,6 +7,7 @@
 #from itemadapter import ItemAdapter
 import json,os
 import pandas as pd
+from time import sleep
 #from pymongo import MongoClient
 
 
@@ -21,10 +22,8 @@ class ImmoelizaPipeline:
             spider (ImmowebscraperSpider): the spider itself
         """
         item.transform()
-        for field in item.fields:
-            item.setdefault(field,None)
         item.pop("js")
-        item.pop("html_elems")
+        #item.pop("html_elems")
         return item
     
     def close_spider(self, spider):
@@ -37,7 +36,11 @@ class ImmoelizaPipeline:
             spider (ImmowebscraperSpider): the spider itself
         """
         print("SPIDER FINISHED!!! ------ Post processing data")
-        df=pd.read_json("data/output.json",orient="columns")
+        sleep(20)
+        try:
+            df=pd.read_json("data/output.json",orient="columns")
+        except:
+            df=pd.read_json("data/output.json")
         df.dropna(subset=["Price","PostalCode"],inplace=True)
         df.drop(df[df["PostalCode"]>10000].index,inplace=True)
         df.to_json("data/final_dataset.json")
